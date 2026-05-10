@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LST Protection Pool</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-block">
+      <h1>DEPEG PROTECTION POOL</h1>
+    </div>
+    <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+  </header>
+
+  <!-- Addr bar -->
+  <div id="addr-bar">
+    <div class="addr-row"><span class="addr-label">Pool</span><span class="addr-val" id="pool-addr-display">—</span></div>
+    <div class="addr-row"><span class="addr-label">Oracle</span><span class="addr-val" id="oracle-addr-display">—</span></div>
+    <div class="addr-row"><span class="addr-label">LST Token</span><span class="addr-val" id="lst-addr-display">—</span></div>
+    <div class="addr-row"><span class="addr-label">Wallet</span><span class="addr-val" id="wallet-addr-display">—</span></div>
+  </div>
+
+  <!-- Pool panel -->
+  <div id="pool-panel">
+    <div class="pool-state-bar">
+      <span style="font-size:14px; font-weight:bold; text-transform:capitalize;">Pool Status</span>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <span id="state-badge" class="state-badge state-OPEN">OPEN</span>
+        <button class="btn btn-primary btn-sm" onclick="refreshAll()">Refresh</button>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label">LST Price</div><div class="stat-value" id="stat-price">—</div></div>
+      <div class="stat"><div class="stat-label">Depeg Threshold</div><div class="stat-value" id="stat-threshold">—</div></div>
+      <div class="stat"><div class="stat-label">Pool Capacity</div><div class="stat-value" id="stat-deposited">—</div></div>
+      <div class="stat"><div class="stat-label">Free Capacity</div><div class="stat-value" id="stat-free">—</div></div>
+      <div class="stat"><div class="stat-label">Total Covered</div><div class="stat-value" id="stat-covered">—</div></div>
+      <div class="stat"><div class="stat-label">Premiums</div><div class="stat-value" id="stat-premiums">—</div></div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Seller -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>Provide Liquidity</span>
+        </div>
+        <div class="panel-body">
+          <div class="field"><label>Deposit amount (ETH)</label><input type="number" id="deposit-amount" value="0.1" step="0.01" min="0.001" /></div>
+          <button class="btn btn-green mt8" onclick="deposit()">Deposit</button>
+          <p class="note" style="margin-top:8px;">Deposit ETH to earn yield.</p>
+          <div style="margin-top:10px; display:flex; justify-content:space-between; font-size:12px;">
+            <span style="color:#111;">Pool Utilisation</span>
+            <span id="util-label" style="font-weight:bold;">0%</span>
+          </div>
+          <div style="margin-top:14px;">
+            <div style="font-size:10px; color:#111; letter-spacing:0.1em; text-transform:capitalize; margin-bottom:6px;">Depositors</div>
+            <div id="sellers-wrap"><div class="empty-note">No deposits yet</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buyer -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>Purchase Protection</span>
+        </div>
+        <div class="panel-body">
+          <div class="field"><label>Coverage amount (ETH)</label><input type="number" id="policy-coverage" value="0.05" step="0.01" min="0.001" oninput="updateQuote()" /></div>
+          <div style="background:#f0f0f0; border:1px solid #d0d0d0; padding:8px 10px; margin-bottom:10px; font-size:11px; color:#111;">
+            Premium required: <span id="premium-quote" style="font-size:13px; font-weight:600; color:#111;">—</span>
+          </div>
+          <button class="btn btn-green mt8" onclick="openPolicy()">Buy Protection</button>
+          <p class="note" style="margin-top:8px;">Premium paid upfront. After a depeg trigger and wait period, an Approve and Settle button appear next to your policy below.</p>
+          <div style="margin-top:14px;">
+            <div style="font-size:10px; color:#111; letter-spacing:0.1em; text-transform:capitalize; margin-bottom:6px;">All Policies</div>
+            <div id="policies-wrap"><div class="empty-note">No policies yet</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Log -->
+  <div id="log-panel">
+    <div class="log-header">Transaction Log</div>
+    <div id="log-entries">
+      <div class="log-entry info"><span class="ts">-</span><span class="msg">Waiting for wallet connection…</span></div>
+    </div>
+  </div>
+
+  <!-- Bottom tools: oracle simulator + faucet -->
+  <div class="testing-tools-wrap">
+    <hr class="testing-tools-divider" />
+    <h2 class="testing-tools-title">Testing Tools</h2>
+  </div>
+  <div class="bottom-tools">
+    <div id="oracle-panel">
+      <div class="oracle-header">
+        <span class="oracle-title">Oracle Price Simulator</span>
+      </div>
+      <div class="field">
+        <label>Price (1.0 = peg, 0.9 = 90%)</label>
+        <input type="number" id="oracle-price-input" value="1.0" step="0.01" min="0" />
+      </div>
+      <button class="btn btn-primary" onclick="setOraclePrice()">Set Price on Chain</button>
+      <button class="btn btn-yellow mt8" onclick="triggerDepeg()">Trigger Depeg</button>
+      <p class="note" style="margin-top:8px;">Manipulate the price reported by the oracle. Can be used by anyone. Press trigger depeg button to change the pool state to TRIGGERED</p>
+    </div>
+
+    <div id="faucet-panel">
+      <div class="oracle-header">
+        <span class="oracle-title">Test LST Token Faucet</span>
+      </div>
+      <div class="field">
+        <label>Recipient Address</label>
+        <input type="text" id="faucet-recipient" placeholder="0x…" />
+      </div>
+      <div class="field">
+        <label>Amount (tstETH)</label>
+        <input type="number" id="faucet-amount" value="100" step="1" min="0" />
+      </div>
+      <button class="btn btn-green" onclick="mintLST()">Mint Tokens</button>
+      <p class="note" style="margin-top:8px;">Anyone can mint to any address</p>
+    </div>
+  </div>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
